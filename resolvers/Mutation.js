@@ -48,14 +48,14 @@ module.exports = {
       .replaceOne({ githubLogin: login }, latestUserInfo, { upsert: true });
     return { user, token: access_token };
   },
-  addFakeUsers: async (root, { count }, { db }) => {
+  addFakeUsers: async (parent, { count }, { db }) => {
     var randomUserApi = `https://randomuser.me/api/?results=${count}`;
     var { results } = await fetch(randomUserApi).then(res => res.json());
     var users = results.map(r => ({
       githubLogin: r.login.username,
       name: `${r.name.first} ${r.name.last}`,
       avatar: r.picture.thumbnail,
-      githubToken: r.login.shal
+      githubToken: r.login.sha1
     }));
     await db.collection("users").insert(users);
     return users;
