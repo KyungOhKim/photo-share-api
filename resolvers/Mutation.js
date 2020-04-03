@@ -3,7 +3,7 @@ const fetch = require("node-fetch");
 const { ObjectID } = require("mongodb");
 
 module.exports = {
-  async postPhoto(parent, args, { db, currentUser }) {
+  async postPhoto(parent, args, { db, currentUser, pubsub }) {
     if (!currentUser) {
       throw new Error("only an authorized user can post a photo");
     }
@@ -14,13 +14,14 @@ module.exports = {
     };
     const { insertedIds } = await db.collection("photos").insertOne(newPhoto);
     newPhoto.id = insertedIds[0];
+    pubsub.publish("photo-added", { newPhoto });
     return newPhoto;
   },
   async tagPhoto(parent, args, { db }) {
     await db.collection("tags").replaceOne(args, args, { upsert: true });
     return db.collection("photos").findOne({ _id: ObjectID(args.photoID) });
   },
-  async githubAuth(parent, { code }, { db }) {
+  async githubAuth(parent, { code }, { db, pubsub }) {
     let {
       message,
       access_token,
@@ -42,13 +43,15 @@ module.exports = {
       avatar: avatar_url
     };
     const {
-      ops: [user]
+      ops: [user],
+      result
     } = await db
       .collection("users")
       .replaceOne({ githubLogin: login }, latestUserInfo, { upsert: true });
+    result.upserted && pubsub.publish("user-added", { newUser: user });
     return { user, token: access_token };
   },
-  addFakeUsers: async (parent, { count }, { db }) => {
+  addFakeUsers: async (parent, { count }, { db, pubsub }) => {
     var randomUserApi = `https://randomuser.me/api/?results=${count}`;
     var { results } = await fetch(randomUserApi).then(res => res.json());
     var users = results.map(r => ({
@@ -57,7 +60,14 @@ module.exports = {
       avatar: r.picture.thumbnail,
       githubToken: r.login.sha1
     }));
-    await db.collection("users").insert(users);
+    await db.collection("users").insertMany(users);
+    var newUsers = await db
+      .collection("users")
+      .find()
+      .sort({ _id: -1 })
+      .limit(count)
+      .toArray();
+    newUsers.forEach(newUser => pubsub.publish("user-added", { newUser }));
     return users;
   },
   async fakeUserAuth(parent, { githubLogin }, { db }) {
