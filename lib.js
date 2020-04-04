@@ -2,46 +2,46 @@ const fetch = require("node-fetch");
 const fs = require("fs");
 
 const findBy = (value, array, field = "id") =>
-  array[array.map(item => item[field]).indexOf(value)];
+  array[array.map((item) => item[field]).indexOf(value)];
 
-const generateFakeUsers = count =>
+const generateFakeUsers = (count) =>
   fetch(`https://randomuser.me/api/?results=${count}`)
-    .then(res => res.json())
-    .catch(error => {
+    .then((res) => res.json())
+    .catch((error) => {
       throw new Error(JSON.stringify(error));
     });
 
-const requestGithubToken = credentials =>
+const requestGithubToken = (credentials) =>
   fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Accept: "application/json"
+      Accept: "application/json",
     },
-    body: JSON.stringify(credentials)
+    body: JSON.stringify(credentials),
   })
-    .then(res => res.json())
-    .catch(error => {
+    .then((res) => res.json())
+    .catch((error) => {
       throw new Error(JSON.stringify(error));
     });
 
-const requestGithubUserAccount = token =>
+const requestGithubUserAccount = (token) =>
   fetch(`https://api.github.com/user?access_token=${token}`)
-    .then(res => res.json())
-    .catch(error => {
+    .then((res) => res.json())
+    .catch((error) => {
       throw new Error(JSON.stringify(error));
     });
 
-const authorizeWithGithub = async credentials => {
+const authorizeWithGithub = async (credentials) => {
   const { access_token } = await requestGithubToken(credentials);
   const githubUser = await requestGithubUserAccount(access_token);
   return { ...githubUser, access_token };
 };
 
-const saveFile = (stream, path) =>
+const uploadStream = (stream, path) =>
   new Promise((resolve, reject) => {
     stream
-      .on("error", error => {
+      .on("error", (error) => {
         if (stream.truncated) {
           fs.unlinkSync(path);
         }
@@ -51,9 +51,9 @@ const saveFile = (stream, path) =>
       .pipe(fs.createWriteStream(path));
   });
 
-const uploadFile = async (file, path) => {
-  const { stream } = await file;
-  return saveFile(stream, path);
+module.exports = {
+  findBy,
+  authorizeWithGithub,
+  generateFakeUsers,
+  uploadStream,
 };
-
-module.exports = { findBy, authorizeWithGithub, generateFakeUsers, uploadFile };

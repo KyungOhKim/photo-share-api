@@ -1,6 +1,8 @@
 const { authorizeWithGithub } = require("../lib");
 const fetch = require("node-fetch");
 const { ObjectID } = require("mongodb");
+const { uploadStream } = require("../lib");
+const path = require("path");
 
 module.exports = {
   async postPhoto(parent, args, { db, currentUser, pubsub }) {
@@ -10,10 +12,20 @@ module.exports = {
     const newPhoto = {
       ...args.input,
       userID: currentUser.githubLogin,
-      created: new Date()
+      created: new Date(),
     };
     const { insertedIds } = await db.collection("photos").insertOne(newPhoto);
     newPhoto.id = insertedIds[0];
+    var toPath = path.join(
+      __dirname,
+      "..",
+      "assets",
+      "photos",
+      `${newPhoto.id}.jpg`
+    );
+    const { stream } = await args.input.file;
+    await uploadStream(stream, toPath);
+
     pubsub.publish("photo-added", { newPhoto });
     return newPhoto;
   },
@@ -27,11 +39,11 @@ module.exports = {
       access_token,
       avatar_url,
       login,
-      name
+      name,
     } = await authorizeWithGithub({
       client_id: process.env.CLIENT_ID,
       client_secret: process.env.CLIENT_SECRET,
-      code
+      code,
     });
     if (message) {
       throw new Error(message);
@@ -40,11 +52,11 @@ module.exports = {
       name,
       githubLogin: login,
       githubToken: access_token,
-      avatar: avatar_url
+      avatar: avatar_url,
     };
     const {
       ops: [user],
-      result
+      result,
     } = await db
       .collection("users")
       .replaceOne({ githubLogin: login }, latestUserInfo, { upsert: true });
@@ -53,12 +65,12 @@ module.exports = {
   },
   addFakeUsers: async (parent, { count }, { db, pubsub }) => {
     var randomUserApi = `https://randomuser.me/api/?results=${count}`;
-    var { results } = await fetch(randomUserApi).then(res => res.json());
-    var users = results.map(r => ({
+    var { results } = await fetch(randomUserApi).then((res) => res.json());
+    var users = results.map((r) => ({
       githubLogin: r.login.username,
       name: `${r.name.first} ${r.name.last}`,
       avatar: r.picture.thumbnail,
-      githubToken: r.login.sha1
+      githubToken: r.login.sha1,
     }));
     await db.collection("users").insertMany(users);
     var newUsers = await db
@@ -67,7 +79,7 @@ module.exports = {
       .sort({ _id: -1 })
       .limit(count)
       .toArray();
-    newUsers.forEach(newUser => pubsub.publish("user-added", { newUser }));
+    newUsers.forEach((newUser) => pubsub.publish("user-added", { newUser }));
     return users;
   },
   async fakeUserAuth(parent, { githubLogin }, { db }) {
@@ -78,7 +90,7 @@ module.exports = {
     }
     return {
       token: user.githubToken,
-      user
+      user,
     };
-  }
+  },
 };

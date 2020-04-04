@@ -6,8 +6,9 @@ const expressPlayground = require("graphql-playground-middleware-express")
   .default;
 const { readFileSync } = require("fs");
 require("dotenv").config();
-const typeDefs = readFileSync("./typeDefs.graphql", "UTF-8");
+var typeDefs = readFileSync("./typeDefs.graphql", "UTF-8");
 const resolvers = require("./resolvers");
+const path = require("path");
 
 async function start() {
   const app = express();
@@ -16,7 +17,7 @@ async function start() {
   try {
     const client = await MongoClient.connect(MONGO_DB, {
       useUnifiedTopology: true,
-      useNewUrlParser: true
+      useNewUrlParser: true,
     });
     db = client.db();
   } catch (error) {
@@ -38,7 +39,7 @@ async function start() {
         : connection.context.Authorization;
       const currentUser = await db.collection("users").findOne({ githubToken });
       return { db, currentUser, pubsub };
-    }
+    },
   });
 
   server.applyMiddleware({ app });
@@ -47,6 +48,10 @@ async function start() {
     let url = `https://github.com/login/oauth/authorize?client_id=${process.env.CLIENT_ID}&scope=user`;
     res.end(`<a href="${url}">Sign In with Github</a>`);
   });
+  app.use(
+    "/img/photos",
+    express.static(path.join(__dirname, "assets", "photos"))
+  );
   const httpServer = createServer(app);
   server.installSubscriptionHandlers(httpServer);
 
