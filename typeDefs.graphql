@@ -13,7 +13,7 @@ type User {
   inPhotos: [Photo!]!
 }
 scalar DateTime
-scalar Upload
+
 type Photo {
   id: ID!
   url: String!
